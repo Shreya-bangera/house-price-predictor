@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>House Price Predictor</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+      min-height: 100vh;
+      padding: 24px 16px;
+      color: #fff;
+    }
+
+    .page {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    header h1 { font-size: clamp(1.6rem, 4vw, 2.2rem); }
+
+    header p {
+      color: rgba(255,255,255,0.5);
+      font-size: 0.9rem;
+      margin-top: 6px;
+    }
+
+    .badge {
+      display: inline-block;
+      margin-top: 10px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      background: rgba(233,69,96,0.2);
+      border: 1px solid rgba(233,69,96,0.4);
+      color: #e94560;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 640px) {
+      .layout { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: rgba(255,255,255,0.05);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 18px;
+      padding: 28px;
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.7);
+      margin-bottom: 20px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      font-size: 0.8rem;
+    }
+
+    /* ── Form ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+
+    @media (max-width: 400px) {
+      .form-grid { grid-template-columns: 1fr; }
+    }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .field.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.6);
+    }
+
+    input, select {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.07);
+      color: #fff;
+      font-size: 0.95rem;
+      outline: none;
+      transition: border 0.2s;
+      width: 100%;
+    }
+
+    input:focus, select:focus { border-color: #e94560; }
+    input::placeholder { color: rgba(255,255,255,0.25); }
+    select option { background: #16213e; }
+
+    button[type="submit"] {
+      margin-top: 20px;
+      width: 100%;
+      padding: 13px;
+      background: linear-gradient(135deg, #e94560, #c0392b);
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+
+    button[type="submit"]:hover  { opacity: 0.88; transform: translateY(-1px); }
+    button[type="submit"]:active { transform: translateY(0); }
+
+    /* ── Results card ── */
+    .results-card {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .price-box {
+      text-align: center;
+      padding: 20px;
+      border-radius: 14px;
+      background: rgba(46,213,115,0.08);
+      border: 1px solid rgba(46,213,115,0.25);
+    }
+
+    .price-box .lbl {
+      font-size: 0.78rem;
+      color: rgba(255,255,255,0.5);
+      margin-bottom: 6px;
+    }
+
+    .price-box .price {
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      font-weight: 700;
+      color: #2ed573;
+    }
+
+    .price-box .range {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.4);
+    }
+
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Feature importance ── */
+    .importance-list { display: flex; flex-direction: column; gap: 10px; }
+
+    .imp-row { display: flex; flex-direction: column; gap: 4px; }
+
+    .imp-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.65);
+    }
+
+    .imp-bar-bg {
+      height: 7px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.08);
+      overflow: hidden;
+    }
+
+    .imp-bar {
+      height: 100%;
+      border-radius: 4px;
+      background: linear-gradient(90deg, #e94560, #f5a623);
+      transition: width 0.6s ease;
+    }
+
+    /* ── Error ── */
+    .error-box {
+      padding: 14px 18px;
+      border-radius: 12px;
+      background: rgba(233,69,96,0.1);
+      border: 1px solid rgba(233,69,96,0.3);
+      color: #e94560;
+      font-size: 0.9rem;
+    }
+
+    /* ── Empty state ── */
+    .empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      color: rgba(255,255,255,0.2);
+      text-align: center;
+      padding: 40px 0;
+    }
+
+    .empty span { font-size: 3rem; }
+    .empty p    { font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>🏠 House Price Predictor</h1>
+    <p>Fill in the property details to get an AI-powered price estimate</p>
+    <span class="badge">Model: {{ model_name }}</span>
+  </header>
+
+  <div class="layout">
+
+    <!-- ── Left: Form ── -->
+    <div class="card">
+      <h2>Property Details</h2>
+      <form action="/predict-form" method="post">
+        <div class="form-grid">
+
+          <div class="field full">
+            <label>Area (sq ft)</label>
+            <input type="number" name="area" placeholder="e.g. 1800"
+                   value="{{ area or '' }}" min="1" required/>
+          </div>
+
+          <div class="field">
+            <label>Bedrooms</label>
+            <input type="number" name="bedrooms" placeholder="e.g. 3"
+                   value="{{ bedrooms or '' }}" min="1" max="20" required/>
+          </div>
+
+          <div class="field">
+            <label>Bathrooms</label>
+            <input type="number" name="bathrooms" placeholder="e.g. 2"
+                   value="{{ bathrooms or '' }}" min="1" max="20" required/>
+          </div>
+
+          <div class="field">
+            <label>Location Score (1–10)</label>
+            <input type="number" name="location_score" placeholder="e.g. 7"
+                   value="{{ location_score or '' }}" min="1" max="10" step="0.1" required/>
+          </div>
+
+          <div class="field">
+            <label>Garage Spaces</label>
+            <select name="garage">
+              {% for i in range(6) %}
+              <option value="{{ i }}" {% if garage is defined and garage == i %}selected{% endif %}>
+                {{ i }} {% if i == 0 %}(None){% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+          <div class="field">
+            <label>Year Built</label>
+            <input type="number" name="year_built" placeholder="e.g. 2005"
+                   value="{{ year_built or '' }}" min="1900" max="2024" required/>
+          </div>
+
+          <div class="field">
+            <label>Floors</label>
+            <select name="floors">
+              {% for i in range(1, 6) %}
+              <option value="{{ i }}" {% if floors is defined and floors == i %}selected{% endif %}>
+                {{ i }}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+
+        </div>
+        <button type="submit">Predict Price</button>
+      </form>
+    </div>
+
+    <!-- ── Right: Results ── -->
+    <div class="card results-card">
+      <h2>Prediction Results</h2>
+
+      {% if error %}
+        <div class="error-box">⚠️ {{ error }}</div>
+      {% endif %}
+
+      {% if predicted_price %}
+
+        <!-- Price -->
+        <div class="price-box">
+          <div class="lbl">Estimated House Price</div>
+          <div class="price">${{ "{:,.0f}".format(predicted_price) }}</div>
+          <div class="range">
+            Range: ${{ "{:,.0f}".format(predicted_price * 0.92) }} –
+                   ${{ "{:,.0f}".format(predicted_price * 1.08) }}
+          </div>
+        </div>
+
+        <!-- Chart.js bar -->
+        <div class="chart-wrap">
+          <canvas id="priceChart"></canvas>
+        </div>
+
+        <!-- Feature importance -->
+        {% if importance_data %}
+        <div>
+          <h2 style="margin-bottom:14px;">What's Driving the Price</h2>
+          <div class="importance-list">
+            {% for feat, pct in importance_data.items() | sort(attribute='1', reverse=True) %}
+            <div class="imp-row">
+              <div class="imp-label">
+                <span>{{ feat.replace('_', ' ').title() }}</span>
+                <span>{{ pct }}%</span>
+              </div>
+              <div class="imp-bar-bg">
+                <div class="imp-bar" style="width: {{ pct }}%"></div>
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+      {% else %}
+        <div class="empty">
+          <span>🏡</span>
+          <p>Your prediction will appear here once you fill in the form.</p>
+        </div>
+      {% endif %}
+    </div>
+
+  </div><!-- /.layout -->
+</div><!-- /.page -->
+
+{% if predicted_price %}
+<script>
+  const price = {{ predicted_price }};
+  const low   = Math.round(price * 0.92);
+  const high  = Math.round(price * 1.08);
+
+  new Chart(document.getElementById("priceChart"), {
+    type: "bar",
+    data: {
+      labels: ["Low Estimate", "Predicted Price", "High Estimate"],
+      datasets: [{
+        data: [low, price, high],
+        backgroundColor: [
+          "rgba(245,166,35,0.6)",
+          "rgba(46,213,115,0.75)",
+          "rgba(233,69,96,0.6)"
+        ],
+        borderColor: [
+          "rgba(245,166,35,1)",
+          "rgba(46,213,115,1)",
+          "rgba(233,69,96,1)"
+        ],
+        borderWidth: 1,
+        borderRadius: 6,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => " $" + ctx.parsed.y.toLocaleString()
+          }
+        }
+      },
+      scales: {
+        x: { ticks: { color: "rgba(255,255,255,0.6)" }, grid: { display: false } },
+        y: {
+          ticks: {
+            color: "rgba(255,255,255,0.6)",
+            callback: v => "$" + (v/1000).toFixed(0) + "k"
+          },
+          grid: { color: "rgba(255,255,255,0.06)" }
+        }
+      }
+    }
+  });
+</script>
+{% endif %}
+
+</body>
+</html>
